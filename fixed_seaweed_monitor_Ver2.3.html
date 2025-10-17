@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アオノリ陸上養殖モニタリングシステム</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f4c75 0%, #3282b8 50%, #7fb069 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #2c3e50;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 25px;
+            padding: 40px;
+            box-shadow: 0 25px 50px rgba(15, 76, 117, 0.2);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid rgba(127, 176, 105, 0.3);
+        }
+
+        h1 {
+            color: #0f4c75;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+
+        .subtitle {
+            color: #3282b8;
+            font-size: 1.2em;
+            margin-top: 10px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, rgba(127, 176, 105, 0.1) 0%, rgba(50, 130, 184, 0.1) 100%);
+            padding: 25px;
+            border-radius: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-weight: 600;
+            color: #0f4c75;
+            font-size: 0.95em;
+        }
+
+        input, select, button {
+            padding: 12px;
+            border: 2px solid rgba(50, 130, 184, 0.3);
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        button {
+            background: linear-gradient(135deg, #3282b8 0%, #7fb069 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(50, 130, 184, 0.3);
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.loading {
+            background: #cce7ff;
+            color: #0f4c75;
+        }
+
+        .sensor-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .sensor-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-left: 5px solid;
+        }
+
+        .sensor-card.light { border-left-color: #ffc107; }
+        .sensor-card.temp { border-left-color: #007bff; }
+        .sensor-card.flow { border-left-color: #28a745; }
+
+        .sensor-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #0f4c75;
+            margin: 10px 0;
+        }
+
+        .sensor-label {
+            color: #3282b8;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+
+        .sensor-unit {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+
+        .chart-wrapper {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .chart-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #0f4c75;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        @media (max-width: 768px) {
+            .controls, .sensor-info, .charts-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>アオノリ陸上養殖モニタリングシステム</h1>
+            <div class="subtitle">日照量・水温・流量リアルタイム監視</div>
+        </div>
+        
+        <div class="controls">
+            <div class="input-group">
+                <label>チャンネルID</label>
+                <input type="number" id="channelId" value="94780">
+            </div>
+            <div class="input-group">
+                <label>リードキー</label>
+                <input type="text" id="readKey" value="06968716dcb297f6">
+            </div>
+            <div class="input-group">
+                <label>データ件数</label>
+                <select id="dataCount">
+                    <option value="100" selected>100件</option>
+                    <option value="200">200件</option>
+                    <option value="500">500件</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>&nbsp;</label>
+                <button id="fetchData">データ取得</button>
+            </div>
+            <div class="input-group">
+                <label>&nbsp;</label>
+                <button id="autoRefresh">自動更新 ON</button>
+            </div>
+        </div>
+
+        <div id="status" class="status" style="display: none;"></div>
+
+        <div class="sensor-info">
+            <div class="sensor-card light">
+                <div class="sensor-label">日照量</div>
+                <div class="sensor-value" id="lightValue">-</div>
+                <div class="sensor-unit">lux</div>
+            </div>
+            <div class="sensor-card temp">
+                <div class="sensor-label">水温</div>
+                <div class="sensor-value" id="tempValue">-</div>
+                <div class="sensor-unit">°C</div>
+            </div>
+            <div class="sensor-card flow">
+                <div class="sensor-label">平均流量</div>
+                <div class="sensor-value" id="flowValue">-</div>
+                <div class="sensor-unit">L/min</div>
+            </div>
+        </div>
+
+        <div class="charts-container" id="chartsContainer"></div>
+    </div>
+
+    <script>
+        class AquacultureMonitor {
+            constructor() {
+                this.charts = {};
+                this.autoRefreshInterval = null;
+                this.isAutoRefresh = false;
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                document.getElementById('fetchData').addEventListener('click', () => this.fetchData());
+                document.getElementById('autoRefresh').addEventListener('click', () => this.toggleAutoRefresh());
+            }
+
+            showStatus(message, type = 'loading') {
+                const statusEl = document.getElementById('status');
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+                statusEl.style.display = 'block';
+            }
+
+            async fetchData() {
+                const channelId = document.getElementById('channelId').value.trim();
+                const readKey = document.getElementById('readKey').value.trim();
+                const dataCount = document.getElementById('dataCount').value;
+
+                if (!channelId || !readKey) {
+                    this.showStatus('チャンネルIDとリードキーを入力してください', 'error');
+                    return;
+                }
+
+                this.showStatus('データ取得中...', 'loading');
+
+                // プロキシ経由でデータ取得
+                try {
+                    const targetUrl = `https://ambidata.io/api/v2/channels/${channelId}/data?readKey=${readKey}&n=${dataCount}`;
+                    const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(targetUrl);
+
+                    console.log('データ取得URL:', proxyUrl);
+                    
+                    const response = await fetch(proxyUrl);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (!result.contents) {
+                        throw new Error('データの取得に失敗しました');
+                    }
+
+                    const data = JSON.parse(result.contents);
+
+                    if (!Array.isArray(data) || data.length === 0) {
+                        throw new Error('データが見つかりません');
+                    }
+
+                    console.log('取得データ:', data);
+                    this.showStatus(`${data.length}件のデータを取得しました`, 'success');
+                    this.updateSensorValues(data[0]);
+                    this.visualizeData(data);
+
+                } catch (error) {
+                    this.showStatus(`エラー: ${error.message}`, 'error');
+                    console.error('データ取得エラー:', error);
+                    
+                    // エラー時はデモデータを表示
+                    console.log('デモデータを表示します');
+                    this.showDemoData();
+                }
+            }
+
+            showDemoData() {
+                const demoData = this.generateDemoData();
+                this.showStatus('デモデータを表示中（実際のAPIへの接続を確認してください）', 'success');
+                this.updateSensorValues(demoData[0]);
+                this.visualizeData(demoData);
+            }
+
+            generateDemoData() {
+                const data = [];
+                const now = new Date();
+                
+                for (let i = 0; i < 50; i++) {
+                    const timestamp = new Date(now.getTime() - i * 60000);
+                    data.push({
+                        d1: 1000 + Math.random() * 500,  // 日照量 1000-1500 lux
+                        d2: 20 + Math.random() * 5,      // 水温 20-25°C
+                        d3: 1 + Math.random() * 2,       // 平均流量 1-3 L/min
+                        d4: 100 + i * 2,                 // 累積流量
+                        d5: 1 + Math.random() * 2,       // 瞬時流量
+                        created: timestamp.toISOString()
+                    });
+                }
+                
+                return data;
+            }
+
+            updateSensorValues(latestData) {
+                // d1: 日照量 (lux)
+                if (latestData.d1 !== null && latestData.d1 !== undefined) {
+                    document.getElementById('lightValue').textContent = latestData.d1.toFixed(1);
+                }
+
+                // d2: 水温 (°C)
+                if (latestData.d2 !== null && latestData.d2 !== undefined) {
+                    document.getElementById('tempValue').textContent = latestData.d2.toFixed(1);
+                }
+
+                // d3: 平均流量 (L/min)
+                if (latestData.d3 !== null && latestData.d3 !== undefined) {
+                    document.getElementById('flowValue').textContent = latestData.d3.toFixed(3);
+                }
+            }
+
+            visualizeData(data) {
+                const chartsContainer = document.getElementById('chartsContainer');
+                chartsContainer.innerHTML = '';
+
+                const sensors = [
+                    { field: 'd1', title: '日照量 (lux)', color: 'rgba(255, 193, 7, alpha)' },
+                    { field: 'd2', title: '水温 (°C)', color: 'rgba(0, 123, 255, alpha)' },
+                    { field: 'd3', title: '平均流量 (L/min)', color: 'rgba(40, 167, 69, alpha)' },
+                    { field: 'd4', title: '累積流量 (L)', color: 'rgba(23, 162, 184, alpha)' }
+                ];
+
+                sensors.forEach(sensor => {
+                    this.createChart(sensor.field, sensor.title, sensor.color, data, chartsContainer);
+                });
+            }
+
+            createChart(field, title, colorTemplate, data, container) {
+                const sortedData = data
+                    .filter(item => item[field] !== null && item[field] !== undefined)
+                    .sort((a, b) => new Date(a.created) - new Date(b.created));
+
+                if (sortedData.length === 0) return;
+
+                const chartWrapper = document.createElement('div');
+                chartWrapper.className = 'chart-wrapper';
+                
+                const titleEl = document.createElement('div');
+                titleEl.className = 'chart-title';
+                titleEl.textContent = title;
+                
+                const chartContainer = document.createElement('div');
+                chartContainer.className = 'chart-container';
+                
+                const canvas = document.createElement('canvas');
+                chartContainer.appendChild(canvas);
+                
+                chartWrapper.appendChild(titleEl);
+                chartWrapper.appendChild(chartContainer);
+                container.appendChild(chartWrapper);
+
+                const labels = sortedData.map(item => {
+                    const date = new Date(item.created);
+                    return date.toLocaleString('ja-JP', { 
+                        month: 'numeric', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                });
+
+                const values = sortedData.map(item => parseFloat(item[field]));
+
+                if (this.charts[field]) {
+                    this.charts[field].destroy();
+                }
+
+                const ctx = canvas.getContext('2d');
+                this.charts[field] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: title,
+                            data: values,
+                            borderColor: colorTemplate.replace('alpha', '1'),
+                            backgroundColor: colorTemplate.replace('alpha', '0.2'),
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3,
+                            pointHoverRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    maxTicksLimit: 8
+                                }
+                            },
+                            y: {
+                                beginAtZero: false
+                            }
+                        }
+                    }
+                });
+            }
+
+            toggleAutoRefresh() {
+                const button = document.getElementById('autoRefresh');
+                
+                if (this.isAutoRefresh) {
+                    clearInterval(this.autoRefreshInterval);
+                    this.isAutoRefresh = false;
+                    button.textContent = '自動更新 ON';
+                    button.style.background = 'linear-gradient(135deg, #3282b8 0%, #7fb069 100%)';
+                } else {
+                    this.fetchData();
+                    this.autoRefreshInterval = setInterval(() => this.fetchData(), 30000);
+                    this.isAutoRefresh = true;
+                    button.textContent = '自動更新 OFF';
+                    button.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            window.app = new AquacultureMonitor();
+            // 初回データ取得
+            window.app.fetchData();
+        });
+    </script>
+</body>
+</html>                             
